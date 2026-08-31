@@ -3,7 +3,12 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
+	"os/exec"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -191,7 +196,7 @@ func TestParseFlags_InvalidArgs(t *testing.T) {
 
 func TestParseFlags_PublicHelp(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	if err := run([]string{"-h"}, &stdout, &stderr); err != nil {
+	if err := run([]string{"-h"}, strings.NewReader(""), &stdout, &stderr); err != nil {
 		t.Fatalf("unexpected help error: %v", err)
 	}
 
@@ -210,13 +215,159 @@ func TestParseFlags_PublicHelp(t *testing.T) {
 	}
 }
 
-func TestRun(t *testing.T) {
-	var stdout, stderr bytes.Buffer
-	err := run([]string{"-m", "2", "-n", "2"}, &stdout, &stderr)
-	if err != nil {
-		t.Fatalf("unexpected error from run: %v", err)
+func TestParseProducerFlags(t *testing.T) {
+	if m, err := parseProducerFlags([]string{"-m", "3"}, io.Discard); err != nil || m != 3 {
+		t.Fatalf("expected m=3, got m=%d, err=%v", m, err)
 	}
-	if stdout.Len() != 0 {
-		t.Errorf("expected no stdout output, got %q", stdout.String())
+
+	for _, args := range [][]string{
+		{},
+		{"-m", "0"},
+		{"-m", "-1"},
+		{"-n", "2"},
+		{"-m", "2", "unexpected"},
+	} {
+		if _, err := parseProducerFlags(args, io.Discard); err == nil {
+			t.Errorf("expected %v to fail", args)
+		}
+	}
+}
+
+func TestParseControlCommand(t *testing.T) {
+	for _, line := range []string{"start 10", "stop 11"} {
+		if _, err := parseControlCommand(line); err != nil {
+			t.Errorf("expected %q to be valid: %v", line, err)
+		}
+	}
+	for _, line := range []string{"", "start", "pause 10", "stop -1", "start later", "stop 10 now"} {
+		if _, err := parseControlCommand(line); err == nil {
+			t.Errorf("expected %q to fail", line)
+		}
+	}
+}
+
+func TestProducerStopsBeforeStartWithoutFrame(t *testing.T) {
+	start := time.Now().Unix() + 2
+	input := fmt.Sprintf("start %d\nstop %d\n", start, start)
+	var output bytes.Buffer
+	if err := run([]string{"producer", "-m", "1"}, strings.NewReader(input), &output, io.Discard); err != nil {
+		t.Fatalf("run producer: %v", err)
+	}
+	if output.Len() != 0 {
+		t.Fatalf("expected no frame, got %q", output.String())
+	}
+}
+
+func TestProducerStreamsConsecutiveFrames(t *testing.T) {
+	start := time.Now().Unix() + 1
+	input := fmt.Sprintf("start %d\nstop %d\n", start, start+2)
+	var output bytes.Buffer
+	if err := runProducer(2, strings.NewReader(input), &output); err != nil {
+		t.Fatalf("run producer: %v", err)
+	}
+
+	decoder := json.NewDecoder(&output)
+	for index := 0; index < 2; index++ {
+		var frame producerFrame
+		if err := decoder.Decode(&frame); err != nil {
+			t.Fatalf("decode frame %d: %v", index, err)
+		}
+		if frame.Second != start+int64(index) {
+			t.Errorf("frame %d: expected second %d, got %d", index, start+int64(index), frame.Second)
+		}
+		var total uint64
+		for _, count := range frame.Counts {
+			total += count
+		}
+		if total == 0 {
+			t.Errorf("frame %d: expected generated values", index)
+		}
+	}
+	var extra json.RawMessage
+	if err := decoder.Decode(&extra); err != io.EOF {
+		t.Fatalf("expected exactly two frames, got %v", err)
+	}
+}
+
+func TestProducerEOFStopsGenerators(t *testing.T) {
+	reader, writer := io.Pipe()
+	result := make(chan error, 1)
+	go func() {
+		result <- runProducer(2, reader, io.Discard)
+	}()
+
+	fmt.Fprintf(writer, "start %d\n", time.Now().Unix())
+	time.Sleep(30 * time.Millisecond)
+	writer.Close()
+
+	select {
+	case err := <-result:
+		if err != nil {
+			t.Fatalf("run producer: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("producer did not stop after stdin EOF")
+	}
+}
+
+func TestMultiProcessRun(t *testing.T) {
+	binary := filepath.Join(t.TempDir(), "concurrent-counter")
+	build := exec.Command("go", "build", "-o", binary, ".")
+	if output, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("build executable: %v\n%s", err, output)
+	}
+
+	var stdout, stderr bytes.Buffer
+	command := exec.Command(binary, "-m", "2", "-n", "2", "-run-for", "2s")
+	command.Stdout = &stdout
+	command.Stderr = &stderr
+	if err := command.Run(); err != nil {
+		t.Fatalf("run executable: %v\nstderr: %s", err, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Errorf("expected no diagnostics, got %q", stderr.String())
+	}
+
+	decoder := json.NewDecoder(&stdout)
+	var previous int64
+	for index := 0; index < 2; index++ {
+		var record outputRecord
+		if err := decoder.Decode(&record); err != nil {
+			t.Fatalf("decode record %d: %v\nstdout: %s", index, err, stdout.String())
+		}
+		second, err := strconv.ParseInt(record.Time, 10, 64)
+		if err != nil {
+			t.Fatalf("record %d has invalid time %q", index, record.Time)
+		}
+		if index > 0 && second != previous+1 {
+			t.Errorf("record %d: expected timestamp %d, got %d", index, previous+1, second)
+		}
+		previous = second
+		if len(record.Counts) != 10 {
+			t.Errorf("record %d: expected ten count keys, got %v", index, record.Counts)
+		}
+		var total uint64
+		for value := 0; value < 10; value++ {
+			total += record.Counts[strconv.Itoa(value)]
+		}
+		if total == 0 {
+			t.Errorf("record %d: expected generated values", index)
+		}
+	}
+	var extra json.RawMessage
+	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
+		t.Fatalf("expected exactly two JSON records, got %v", err)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	invalid := exec.Command(binary, "-n", "0")
+	invalid.Stdout = &stdout
+	invalid.Stderr = &stderr
+	if err := invalid.Run(); err == nil {
+		t.Fatal("expected invalid public arguments to fail")
+	}
+	if stdout.Len() != 0 || !strings.Contains(stderr.String(), "n must be greater than 0") {
+		t.Fatalf("unexpected invalid-argument output: stdout=%q stderr=%q", stdout.String(), stderr.String())
 	}
 }
