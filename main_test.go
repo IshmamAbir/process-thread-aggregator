@@ -1,13 +1,16 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -310,13 +313,165 @@ func TestProducerEOFStopsGenerators(t *testing.T) {
 	}
 }
 
-func TestMultiProcessRun(t *testing.T) {
+func TestProducerRejectsBadControlInputWithoutHanging(t *testing.T) {
+	future := time.Now().Unix() + 60
+	for name, input := range map[string]string{
+		"missing start":       "",
+		"wrong first command": fmt.Sprintf("stop %d\n", future),
+		"malformed stop":      fmt.Sprintf("start %d\npause %d\n", future, future+1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			result := make(chan error, 1)
+			go func() { result <- runProducer(1, strings.NewReader(input), io.Discard) }()
+			select {
+			case err := <-result:
+				if err == nil {
+					t.Fatal("expected control error")
+				}
+			case <-time.After(time.Second):
+				t.Fatal("producer hung on invalid control input")
+			}
+		})
+	}
+}
+
+type failingWriter struct{ err error }
+
+func (w failingWriter) Write([]byte) (int, error) { return 0, w.err }
+
+func TestOutputWriteErrorsPropagate(t *testing.T) {
+	want := errors.New("write failed")
+	if err := newAggregator(1, 1, failingWriter{want}).add(0, producerFrame{Second: 1}); !errors.Is(err, want) {
+		t.Fatalf("aggregator: expected %v, got %v", want, err)
+	}
+
+	start := time.Now().Unix() - 1
+	input := fmt.Sprintf("start %d\nstop %d\n", start, start+1)
+	if err := runProducer(1, strings.NewReader(input), failingWriter{want}); !errors.Is(err, want) {
+		t.Fatalf("producer: expected %v, got %v", want, err)
+	}
+}
+
+func TestProducerFailureAndRemainingChildCleanup(t *testing.T) {
+	failing := startHelperProcess(t, "fail")
+	remaining := startHelperProcess(t, "wait")
+	events := make(chan producerEvent, 2)
+	cancelled := make(chan struct{})
+	go readProducer(0, failing, events, cancelled)
+	go readProducer(1, remaining, events, cancelled)
+	fmt.Fprintln(failing.control, "start 1")
+
+	event := <-events
+	if event.err == nil || !strings.Contains(event.err.Error(), "exited") {
+		t.Fatalf("expected producer exit error, got %v", event.err)
+	}
+	abortChildren([]*producerChild{failing, remaining}, func() { close(cancelled) }, time.Second)
+	if remaining.command.ProcessState == nil {
+		t.Fatal("remaining producer was not reaped")
+	}
+}
+
+func TestAbortChildrenKillsAndReapsHungProducer(t *testing.T) {
+	child := startHelperProcess(t, "hang")
+	cancelled := make(chan struct{})
+	go readProducer(0, child, make(chan producerEvent, 1), cancelled)
+	abortChildren([]*producerChild{child}, func() { close(cancelled) }, 0)
+	if child.command.ProcessState == nil || child.command.ProcessState.Success() {
+		t.Fatal("hung producer was not killed and reaped")
+	}
+}
+
+func TestChildStartupFailureAllowsExistingChildCleanup(t *testing.T) {
+	child := startHelperProcess(t, "wait")
+	cancelled := make(chan struct{})
+	go readProducer(0, child, make(chan producerEvent, 1), cancelled)
+
+	if _, err := startProducer(filepath.Join(t.TempDir(), "missing"), 1, io.Discard); err == nil {
+		t.Fatal("expected child startup failure")
+	}
+	abortChildren([]*producerChild{child}, func() { close(cancelled) }, time.Second)
+	if child.command.ProcessState == nil {
+		t.Fatal("existing producer was not reaped")
+	}
+}
+
+func TestInterruptStopsParentCleanly(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("os.Interrupt cannot be sent on Windows")
+	}
+
+	command := exec.Command(buildTestBinary(t), "-m", "1", "-n", "2")
+	var stdout, stderr bytes.Buffer
+	command.Stdout, command.Stderr = &stdout, &stderr
+	if err := command.Start(); err != nil {
+		t.Fatalf("start executable: %v", err)
+	}
+	time.Sleep(500 * time.Millisecond)
+	if err := command.Process.Signal(os.Interrupt); err != nil {
+		t.Fatalf("interrupt executable: %v", err)
+	}
+
+	done := make(chan error, 1)
+	go func() { done <- command.Wait() }()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("interrupted executable: %v\nstderr: %s", err, stderr.String())
+		}
+	case <-time.After(5 * time.Second):
+		command.Process.Kill()
+		t.Fatal("parent did not stop after interrupt")
+	}
+	if stdout.Len() != 0 || stderr.Len() != 0 {
+		t.Fatalf("unexpected output: stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+}
+
+func startHelperProcess(t *testing.T, mode string) *producerChild {
+	t.Helper()
+	command := exec.Command(os.Args[0], "-test.run=^TestProducerProcessHelper$", "--", mode)
+	command.Env = append(os.Environ(), "GO_WANT_PRODUCER_HELPER=1")
+	control, err := command.StdinPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	output, err := command.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := command.Start(); err != nil {
+		t.Fatal(err)
+	}
+	return &producerChild{command, control, output, make(chan struct{})}
+}
+
+func TestProducerProcessHelper(t *testing.T) {
+	if os.Getenv("GO_WANT_PRODUCER_HELPER") != "1" {
+		return
+	}
+	switch os.Args[len(os.Args)-1] {
+	case "fail":
+		bufio.NewReader(os.Stdin).ReadString('\n')
+		os.Exit(1)
+	case "wait":
+		io.Copy(io.Discard, os.Stdin)
+	case "hang":
+		time.Sleep(time.Hour)
+	}
+}
+
+func buildTestBinary(t *testing.T) string {
+	t.Helper()
 	binary := filepath.Join(t.TempDir(), "concurrent-counter")
 	build := exec.Command("go", "build", "-o", binary, ".")
 	if output, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build executable: %v\n%s", err, output)
 	}
+	return binary
+}
 
+func TestMultiProcessRun(t *testing.T) {
+	binary := buildTestBinary(t)
 	var stdout, stderr bytes.Buffer
 	command := exec.Command(binary, "-m", "2", "-n", "2", "-run-for", "2s")
 	command.Stdout = &stdout
