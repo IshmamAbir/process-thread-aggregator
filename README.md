@@ -6,11 +6,11 @@
 
 ## 必要なもの
 
-- Go 1.22 以上: <https://go.dev/dl/>
 - Bash、PowerShell、コマンドプロンプトなどのターミナル
+- ソースコードから実行する場合は Go 1.22 以上: <https://go.dev/dl/>
 - Git（リポジトリを clone する場合）
 
-Go が使えるか確認します。
+ソースコードから実行する場合は、Go が使えるか確認します。
 
 ```text
 go version
@@ -20,9 +20,18 @@ Go 1.22 以上が表示されたら、準備は完了です。このプロジェ
 
 ## 実行する方法
 
+### 目次
+
+1. [方法 1: ソースコードから実行する](#run-from-source)
+2. [方法 2: Release をダウンロードする](#download-release)
+
+<a id="run-from-source"></a>
+
+### 方法 1: ソースコードから実行する
+
 プログラムを実行するパソコンで、次の手順を行ってください。
 
-### ステップ 1: Go をインストールする
+#### ステップ 1: Go をインストールする
 
 <https://go.dev/dl/> から Go 1.22 以上をインストールします。インストールした後、ターミナルを一度閉じて、もう一度開いてください。
 
@@ -38,11 +47,11 @@ go version
 go version go1.22.0 windows/amd64
 ```
 
-### ステップ 2: ソースコードをダウンロードする
+#### ステップ 2: ソースコードをダウンロードする
 
 ブラウザでダウンロードする方法と、Git で clone する方法があります。どちらを選んでも同じファイルを取得できます。
 
-#### 方法 A: Git を使わずに GitHub からダウンロードする
+##### 方法 A: Git を使わずに GitHub からダウンロードする
 
 1. ブラウザで <https://github.com/IshmamAbir/process-thread-aggregator> を開きます。
 2. ファイル一覧の上にある緑色の **Code** ボタンをクリックします。
@@ -65,7 +74,7 @@ go version go1.22.0 windows/amd64
 ![GitHub の Code メニューで Download ZIP を選ぶ](docs/images/github-download-zip.png)
 -->
 
-#### 方法 B: Git で clone する
+##### 方法 B: Git で clone する
 
 PowerShell、コマンドプロンプト、またはターミナルで次のコマンドを実行します。
 
@@ -76,7 +85,7 @@ cd process-thread-aggregator
 
 Git は `process-thread-aggregator` フォルダーを作り、リポジトリをダウンロードします。`cd` コマンドは、そのフォルダーへ移動するコマンドです。
 
-### ステップ 3: ソースファイルを確認する
+#### ステップ 3: ソースファイルを確認する
 
 Windows PowerShell では、次のコマンドを実行します。
 
@@ -100,7 +109,7 @@ README.md
 README.en.md
 ```
 
-### ステップ 4: プログラムを続けて実行する
+#### ステップ 4: プログラムを続けて実行する
 
 Windows、Linux、macOS で同じコマンドを使えます。
 
@@ -116,7 +125,7 @@ go run . -m 4 -n 2
 
 ステップ 5 で出力を確認する間も、プログラムを動かしたままにしてください。
 
-### ステップ 5: 出力を確認する
+#### ステップ 5: 出力を確認する
 
 最初の 1 秒が終わるまで待ちます。ターミナルには、1 行ごとに次のような JSON が表示されます。
 
@@ -132,7 +141,7 @@ go run . -m 4 -n 2
 
 thread はランダムな数を作るので、実行するたびに count が変わります。JSON が 2 行以上表示されたら、`Ctrl+C` を 1 回押してプログラムを止めます。親 process は各 producer に停止コマンドを送り、終了を待ちます。2 秒たっても producer が終了しない場合は、強制終了します。
 
-### ステップ 6: 5 秒間だけ実行する
+#### ステップ 6: 5 秒間だけ実行する
 
 5 秒後にプログラムを止めたい場合は、`-run-for 5s` を付けます。
 
@@ -142,7 +151,7 @@ go run . -m 2 -n 2 -run-for 5s
 
 このコマンドは、2 個の producer process の中で generator thread を 2 個ずつ始めます。完了した 1 秒ごとの結果を表示し、5 秒後に producer process を終了して、ターミナルに戻ります。
 
-### ステップ 7: process と thread の数を変える
+#### ステップ 7: process と thread の数を変える
 
 必要に合わせて `-m` と `-n` の値を変えられます。次の例では、producer process を 4 個、その中に generator thread を 8 個ずつ作ります。
 
@@ -152,7 +161,7 @@ go run . -m 8 -n 4 -run-for 10s
 
 どちらの値も 0 より大きくしてください。値を大きくすると、同時に行う処理と、1 秒間に作る数が増えます。
 
-### ステップ 8: テストを実行する
+#### ステップ 8: テストを実行する
 
 普通のテストを実行します。
 
@@ -168,20 +177,18 @@ go test -race ./...
 
 race detector には CGO と対応する C compiler が必要です。Windows では WSL を使うか、C compiler をインストールして `CGO_ENABLED=1` を設定してください。
 
-### ステップ 9: 実行ファイルを作る
+#### ステップ 9: 実行ファイルを作る
 
 実行ファイルを作らなくても、`go run .` でプログラムを確認できます。実行ファイルを作る場合は、次のコマンドを使います。
 
-## 実行ファイルを作って動かす
-
-### Linux と macOS
+##### Linux と macOS
 
 ```text
 go build -o concurrent-counter .
 ./concurrent-counter -m 2 -n 2 -run-for 5s
 ```
 
-### Windows PowerShell とコマンドプロンプト
+##### Windows PowerShell とコマンドプロンプト
 
 ```text
 go build -o concurrent-counter.exe .
@@ -189,6 +196,33 @@ go build -o concurrent-counter.exe .
 ```
 
 プログラムは、同じ実行ファイルから producer process を始めます。実行が終わるまで、実行ファイルを移動しないでください。
+
+<a id="download-release"></a>
+
+### 方法 2: Release をダウンロードする
+
+Go をインストールせずに実行する場合は、[最新の Release](https://github.com/IshmamAbir/process-thread-aggregator/releases/latest) から作成済みの package をダウンロードしてください。
+
+| OS | CPU | package の末尾 |
+| --- | --- | --- |
+| macOS | Apple silicon | `darwin_arm64.tar.gz` |
+| macOS | Intel | `darwin_amd64.tar.gz` |
+| Windows | Intel/AMD 64-bit | `windows_amd64.zip` |
+| Windows | ARM 64-bit | `windows_arm64.zip` |
+| Linux | Intel/AMD 64-bit | `linux_amd64.tar.gz` |
+| Linux | ARM 64-bit | `linux_arm64.tar.gz` |
+
+package を展開して、実行ファイルを起動します。
+
+```text
+# Linux または macOS
+./concurrent-counter -m 2 -n 2 -run-for 5s
+
+# Windows
+.\concurrent-counter.exe -m 2 -n 2 -run-for 5s
+```
+
+Release の `checksums.txt` には、各 package の SHA-256 digest が入っています。
 
 ## コマンドラインのオプション
 
@@ -258,6 +292,17 @@ go build -o concurrent-counter .
 すべての Go ファイルが正しい形式なら、`gofmt -l .` は何も表示しません。ほかのコマンドは、問題がなければ終了 status `0` を返します。race detector には CGO と対応する C compiler が必要です。Windows では C compiler をインストールして `CGO_ENABLED=1` を設定するか、Linux または WSL で実行してください。
 
 テストでは、counter の更新と秒の境界、共有 map への同時アクセス、producer 間の集計、JSON の作成、不正な入力、producer のエラー、終了時の処理、interrupt、複数 process での完全な実行を確認します。
+
+## GitHub Release を公開する
+
+名前が `v` で始まる tag を push すると、Release workflow が動きます。公開する commit に annotated semantic-version tag を作り、push してください。
+
+```text
+git tag -a v1.0.0 -m "v1.0.0"
+git push origin v1.0.0
+```
+
+GitHub Actions は `go test ./...` を実行し、上の表にある 6 個の package と `checksums.txt` を作り、自動生成した release note と一緒に GitHub Release を公開します。Release の説明では、download link を Mac、Windows、Linux に分け、各 asset に同じ platform label を付けます。テストは Linux AMD64 で実行します。ほかの 5 個の package は Go で cross-compile しますが、それぞれの対象 OS では実行しません。
 
 ## 問題がある場合
 
