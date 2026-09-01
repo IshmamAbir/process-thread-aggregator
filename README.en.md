@@ -2,7 +2,7 @@
 
 [日本語](README.md) | [English](README.en.md)
 
-Concurrent number aggregator for the MeeQ assignment. It uses only the Go standard library.
+Concurrent number aggregator challenge. It uses only the Go standard library.
 
 ## Requirements
 
