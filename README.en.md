@@ -6,11 +6,11 @@ Concurrent number aggregator challenge. It uses only the Go standard library.
 
 ## Requirements
 
-- Go 1.22 or newer: <https://go.dev/dl/>
 - A terminal such as Bash, PowerShell, or Command Prompt
+- Go 1.22 or newer when running from source: <https://go.dev/dl/>
 - Git, if you obtain the source by cloning the repository
 
-Confirm that Go is available:
+If you plan to run from source, confirm that Go is available:
 
 ```text
 go version
@@ -18,11 +18,20 @@ go version
 
 The command should report Go 1.22 or a newer version. This project uses only the Go standard library, so you do not need to install packages or start external services.
 
-## How to run: step-by-step
+## How to run
+
+### Contents
+
+1. [Option 1: Run from source](#run-from-source)
+2. [Option 2: Download a release](#download-release)
+
+<a id="run-from-source"></a>
+
+### Option 1: Run from source
 
 Follow these steps from the computer where you want to run the program.
 
-### Step 1: Install Go
+#### Step 1: Install Go
 
 Install Go 1.22 or newer from <https://go.dev/dl/>. Close and reopen your terminal after installation.
 
@@ -38,11 +47,11 @@ Continue when the output shows Go 1.22 or newer, for example:
 go version go1.22.0 windows/amd64
 ```
 
-### Step 2: Download the source
+#### Step 2: Download the source
 
 Choose either the browser download or Git clone option. Both provide the same source files.
 
-#### Option A: Download from GitHub without Git
+##### Option A: Download from GitHub without Git
 
 1. Open <https://github.com/IshmamAbir/process-thread-aggregator> in a web browser.
 2. Click the green **Code** button above the file list.
@@ -65,7 +74,7 @@ Choose either the browser download or Git clone option. Both provide the same so
 ![GitHub Code menu with Download ZIP highlighted](docs/images/github-download-zip.png)
 -->
 
-#### Option B: Clone with Git
+##### Option B: Clone with Git
 
 Run these commands in PowerShell, Command Prompt, or a terminal:
 
@@ -77,7 +86,7 @@ cd process-thread-aggregator
 Git creates the `process-thread-aggregator` folder and downloads the repository into it. The `cd` command moves your terminal into that folder.
 
 
-### Step 3: Confirm the source files
+#### Step 3: Confirm the source files
 
 On Windows PowerShell, run:
 
@@ -101,7 +110,7 @@ README.md
 README.en.md
 ```
 
-### Step 4: Run continuously
+#### Step 4: Run continuously
 
 Run the same command on Windows, Linux, or macOS:
 
@@ -117,7 +126,7 @@ The command uses these settings:
 
 Leave the command running while you check the output in Step 5.
 
-### Step 5: Check the output
+#### Step 5: Check the output
 
 Wait for the first complete one-second interval. The terminal should print one JSON object per line in this form:
 
@@ -133,7 +142,7 @@ Check the following fields:
 
 The counts vary between runs because the threads generate random numbers. After you see at least two JSON records, press `Ctrl+C` once to stop the program. The parent sends a stop command to each producer, waits for them to exit, and kills any producer that remains after two seconds.
 
-### Step 6: Run a five-second example
+#### Step 6: Run a five-second example
 
 Add `-run-for 5s` when you want the program to stop after five seconds:
 
@@ -143,7 +152,7 @@ go run . -m 2 -n 2 -run-for 5s
 
 This command starts two generator threads in each of two producer processes. It prints completed one-second records, stops after five seconds, cleans up the producer processes, and returns control to the terminal.
 
-### Step 7: Run with different process and thread counts
+#### Step 7: Run with different process and thread counts
 
 Replace the `-m` and `-n` values as needed. This example starts four producer processes with eight generator threads in each producer:
 
@@ -153,7 +162,7 @@ go run . -m 8 -n 4 -run-for 10s
 
 Both values must be greater than zero. Larger values create more concurrent work and produce more numbers per interval.
 
-### Step 8: Run the tests
+#### Step 8: Run the tests
 
 Run the standard test suite:
 
@@ -169,20 +178,18 @@ go test -race ./...
 
 The race detector requires CGO and a supported C compiler. Windows users can run this check in WSL or install a C compiler and set `CGO_ENABLED=1`.
 
-### Step 9: Build a reusable executable
+#### Step 9: Build a reusable executable
 
-You can use `go run .` for evaluation without building an executable. To create one, follow the platform commands in the next section.
+You can use `go run .` for evaluation without building an executable. Use the command for your platform to create one.
 
-## Build and run an executable
-
-### Linux and macOS
+##### Linux and macOS
 
 ```text
 go build -o concurrent-counter .
 ./concurrent-counter -m 2 -n 2 -run-for 5s
 ```
 
-### Windows PowerShell or Command Prompt
+##### Windows PowerShell or Command Prompt
 
 ```text
 go build -o concurrent-counter.exe .
@@ -190,6 +197,33 @@ go build -o concurrent-counter.exe .
 ```
 
 The program starts the producer processes from the same executable. Keep the executable in place until the run finishes.
+
+<a id="download-release"></a>
+
+### Option 2: Download a release
+
+Download a compiled package from the [latest release](https://github.com/IshmamAbir/process-thread-aggregator/releases/latest) if you do not want to install Go.
+
+| Operating system | CPU | Package suffix |
+| --- | --- | --- |
+| macOS | Apple silicon | `darwin_arm64.tar.gz` |
+| macOS | Intel | `darwin_amd64.tar.gz` |
+| Windows | Intel/AMD 64-bit | `windows_amd64.zip` |
+| Windows | ARM 64-bit | `windows_arm64.zip` |
+| Linux | Intel/AMD 64-bit | `linux_amd64.tar.gz` |
+| Linux | ARM 64-bit | `linux_arm64.tar.gz` |
+
+Extract the package, then run the executable:
+
+```text
+# Linux or macOS
+./concurrent-counter -m 2 -n 2 -run-for 5s
+
+# Windows
+.\concurrent-counter.exe -m 2 -n 2 -run-for 5s
+```
+
+The release also contains `checksums.txt` with the SHA-256 digest of each package.
 
 ## Command-line options
 
@@ -259,6 +293,17 @@ go build -o concurrent-counter .
 `gofmt -l .` produces no output when all Go files use standard formatting. Each other command returns exit status zero when its check succeeds. The race detector needs CGO and a supported C compiler. On Windows, install a C compiler and set `CGO_ENABLED=1`, or run the race check in Linux or WSL.
 
 The tests cover counter updates and second boundaries, concurrent access to the shared map, aggregation across producers, JSON encoding, invalid input, producer failures, shutdown cleanup, interrupts, and a complete multi-process run.
+
+## Publish a GitHub release
+
+The release workflow runs when you push a tag whose name starts with `v`. Create and push an annotated semantic-version tag from the commit you want to publish:
+
+```text
+git tag -a v1.0.0 -m "v1.0.0"
+git push origin v1.0.0
+```
+
+GitHub Actions runs `go test ./...`, builds the six packages listed above, creates `checksums.txt`, and publishes a GitHub Release with generated release notes. The release description groups direct download links under Mac, Windows, and Linux, and each asset has a matching platform label. The test suite runs on Linux AMD64; Go cross-compiles the other five packages without running them on their target systems.
 
 ## Troubleshooting
 
