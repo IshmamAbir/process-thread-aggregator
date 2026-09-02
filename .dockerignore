@@ -1,0 +1,5 @@
+.git
+.vscode
+concurrent-counter
+*.exe
+.DS_Store

@@ -24,6 +24,7 @@ Go 1.22 以上が表示されたら、準備は完了です。このプロジェ
 
 1. [方法 1: ソースコードから実行する](#run-from-source)
 2. [方法 2: Release をダウンロードする](#download-release)
+3. [方法 3: Docker で実行する](#run-with-docker)
 
 <a id="run-from-source"></a>
 
@@ -47,6 +48,8 @@ go version
 go version go1.22.0 windows/amd64
 ```
 
+<a id="download-source"></a>
+
 #### ステップ 2: ソースコードをダウンロードする
 
 ブラウザでダウンロードする方法と、Git で clone する方法があります。どちらを選んでも同じファイルを取得できます。
@@ -65,14 +68,6 @@ go version go1.22.0 windows/amd64
 
 6. 展開した `process-thread-aggregator-main` フォルダーを開きます。フォルダー名の最後の部分は、GitHub のブランチ名によって変わる場合があります。
 7. そのフォルダーでターミナルを開きます。
-
-<!-- 画像を用意したら、この場所にダウンロード方法の画像を追加してください。 -->
-
-> **画像を追加する場所:** GitHub の **Code** メニューで、**Download ZIP** を選ぶ画像を追加します。
-
-<!-- ファイルを追加した後に使う Markdown の例:
-![GitHub の Code メニューで Download ZIP を選ぶ](docs/images/github-download-zip.png)
--->
 
 ##### 方法 B: Git で clone する
 
@@ -224,6 +219,32 @@ package を展開して、実行ファイルを起動します。
 
 Release の `checksums.txt` には、各 package の SHA-256 digest が入っています。
 
+<a id="run-with-docker"></a>
+
+### 方法 3: Docker で実行する
+
+最初に、[ソースコードをダウンロード](#download-source)し、ダウンロードしたリポジトリのフォルダーでターミナルを開きます。リンク先では、GitHub の ZIP download と Git clone の両方を説明しています。
+
+Docker をインストールして起動した後、リポジトリのフォルダーで image を作ります。
+
+```text
+docker build -t concurrent-counter .
+```
+
+プログラムを続けて実行します。停止するには `Ctrl+C` を押します。
+
+```text
+docker run --rm concurrent-counter -m 2 -n 2
+```
+
+プログラムを 5 秒間実行します。
+
+```text
+docker run --rm concurrent-counter -m 2 -n 2 -run-for 5s
+```
+
+image 名の後に書く option は、下のコマンドライン option と同じです。`--rm` は停止した container を削除します。
+
 ## コマンドラインのオプション
 
 producer process を始めずに、使えるオプションを表示できます。
@@ -246,6 +267,13 @@ go run . -help
 
 # Windows
 .\concurrent-counter.exe -h
+```
+
+Docker でも同じように help flag を使えます。
+
+```text
+docker run --rm concurrent-counter -h
+docker run --rm concurrent-counter -help
 ```
 
 | オプション | 説明 | デフォルト |
