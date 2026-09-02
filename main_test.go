@@ -463,6 +463,9 @@ func TestProducerProcessHelper(t *testing.T) {
 func buildTestBinary(t *testing.T) string {
 	t.Helper()
 	binary := filepath.Join(t.TempDir(), "concurrent-counter")
+	if runtime.GOOS == "windows" {
+		binary += ".exe"
+	}
 	build := exec.Command("go", "build", "-o", binary, ".")
 	if output, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build executable: %v\n%s", err, output)

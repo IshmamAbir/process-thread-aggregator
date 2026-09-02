@@ -99,6 +99,9 @@ ls
 ```text
 go.mod
 main.go
+flags.go
+producer.go
+aggregator.go
 main_test.go
 README.md
 README.en.md
