@@ -69,14 +69,6 @@ go version go1.22.0 windows/amd64
 6. 展開した `process-thread-aggregator-main` フォルダーを開きます。フォルダー名の最後の部分は、GitHub のブランチ名によって変わる場合があります。
 7. そのフォルダーでターミナルを開きます。
 
-<!-- 画像を用意したら、この場所にダウンロード方法の画像を追加してください。 -->
-
-> **画像を追加する場所:** GitHub の **Code** メニューで、**Download ZIP** を選ぶ画像を追加します。
-
-<!-- ファイルを追加した後に使う Markdown の例:
-![GitHub の Code メニューで Download ZIP を選ぶ](docs/images/github-download-zip.png)
--->
-
 ##### 方法 B: Git で clone する
 
 PowerShell、コマンドプロンプト、またはターミナルで次のコマンドを実行します。

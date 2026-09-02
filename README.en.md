@@ -69,14 +69,6 @@ Choose either the browser download or Git clone option. Both provide the same so
 6. Open the extracted `process-thread-aggregator-main` folder. The exact suffix may match the branch that GitHub downloaded.
 7. Open a terminal in that folder.
 
-<!-- Replace this placeholder with the download screenshot when the image is available. -->
-
-> **Screenshot placeholder:** Add an image showing the GitHub **Code** menu with **Download ZIP** highlighted.
-
-<!-- Suggested Markdown after adding the file:
-![GitHub Code menu with Download ZIP highlighted](docs/images/github-download-zip.png)
--->
-
 ##### Option B: Clone with Git
 
 Run these commands in PowerShell, Command Prompt, or a terminal:
