@@ -24,6 +24,7 @@ The command should report Go 1.22 or a newer version. This project uses only the
 
 1. [Option 1: Run from source](#run-from-source)
 2. [Option 2: Download a release](#download-release)
+3. [Option 3: Run with Docker](#run-with-docker)
 
 <a id="run-from-source"></a>
 
@@ -46,6 +47,8 @@ Continue when the output shows Go 1.22 or newer, for example:
 ```text
 go version go1.22.0 windows/amd64
 ```
+
+<a id="download-source"></a>
 
 #### Step 2: Download the source
 
@@ -225,6 +228,32 @@ Extract the package, then run the executable:
 
 The release also contains `checksums.txt` with the SHA-256 digest of each package.
 
+<a id="run-with-docker"></a>
+
+### Option 3: Run with Docker
+
+First, [download the source](#download-source) and open a terminal in the downloaded repository directory. The linked step covers GitHub ZIP download and Git clone.
+
+With Docker installed and running, build the image from the repository directory:
+
+```text
+docker build -t concurrent-counter .
+```
+
+Run the program continuously, then press `Ctrl+C` to stop it:
+
+```text
+docker run --rm concurrent-counter -m 2 -n 2
+```
+
+Run the program for five seconds:
+
+```text
+docker run --rm concurrent-counter -m 2 -n 2 -run-for 5s
+```
+
+The options after the image name are the same command-line options described below. `--rm` removes the stopped container.
+
 ## Command-line options
 
 Display the available command-line options without starting producer processes:
@@ -247,6 +276,13 @@ Use the help flag with a compiled executable in the same way:
 
 # Windows
 .\concurrent-counter.exe -h
+```
+
+Use the help flags with Docker in the same way:
+
+```text
+docker run --rm concurrent-counter -h
+docker run --rm concurrent-counter -help
 ```
 
 | Option | Meaning | Default |
