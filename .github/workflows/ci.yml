@@ -31,3 +31,8 @@ jobs:
 
       - name: Build
         run: go build -o concurrent-counter .
+
+      - name: Docker image build and run
+        run: |
+          docker build -t concurrent-counter:test .
+          docker run --rm concurrent-counter:test -m 1 -n 2 -run-for 1s
